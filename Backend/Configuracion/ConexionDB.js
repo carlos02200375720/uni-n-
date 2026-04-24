@@ -1,39 +1,65 @@
-/**
- * CONFIGURACIÓN DE CONEXIÓN A LA BASE DE DATOS
- * Este archivo establece el puente entre el servidor Node.js 
- * y el motor de la base de datos (como MongoDB o PostgreSQL).
- */
+const mongoose = require('mongoose');
 
-// En un entorno real usaríamos: const mongoose = require('mongoose');
+let servidorMongoEnMemoria = null;
+
+const conectarMongoEnMemoria = async () => {
+  const { MongoMemoryServer } = require('mongodb-memory-server');
+
+  servidorMongoEnMemoria = await MongoMemoryServer.create({
+    instance: { ip: '127.0.0.1' }
+  });
+
+  const uriEnMemoria = servidorMongoEnMemoria.getUri();
+  const conn = await mongoose.connect(uriEnMemoria, {
+    family: 4
+  });
+
+  console.warn('⚠️ Atlas no estuvo disponible. Se inició MongoDB en memoria para desarrollo.');
+
+  return {
+    conn,
+    usaMongoEnMemoria: true
+  };
+};
 
 const conectarBaseDeDatos = async () => {
   try {
-    console.log("⏳ Intentando conectar con la base de datos...");
+    console.log("⏳ Intentando conectar con la base de datos real...");
 
-    /**
-     * LÓGICA DE CONEXIÓN:
-     * Aquí es donde se coloca la URL secreta de tu base de datos.
-     * Ejemplo: mongodb+srv://usuario:password@cluster.mongodb.net/mi_app
-     */
-    
-    // Simulamos una conexión exitosa con una promesa
-    const conexionExitosa = true;
-
-    if (conexionExitosa) {
-      console.log("==================================================");
-      console.log("✅ BASE DE DATOS CONECTADA: Almacenamiento listo.");
-      console.log("==================================================");
-    } else {
-      throw new Error("La base de datos rechazó la conexión.");
+    if (!process.env.MONGODB_URI) {
+      throw new Error('La variable MONGODB_URI no está definida en el archivo .env');
     }
 
+    const conn = await mongoose.connect(process.env.MONGODB_URI, {
+      family: 4,
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000
+    });
+
+    console.log("==================================================");
+    console.log(`✅ BASE DE DATOS CONECTADA: ${conn.connection.host}`);
+    console.log("==================================================");
+
+    return {
+      conn,
+      usaMongoEnMemoria: false
+    };
   } catch (error) {
-    console.error("❌ ERROR DE CONEXIÓN:");
+    console.error("❌ ERROR DE CONEXIÓN REAL:");
     console.error(error.message);
-    
-    // Si la base de datos no conecta, el servidor debe detenerse
-    process.exit(1); 
+
+    if (process.env.NODE_ENV === 'production') {
+      throw error;
+    }
+
+    return conectarMongoEnMemoria();
   }
 };
+
+process.on('exit', async () => {
+  if (servidorMongoEnMemoria) {
+    await servidorMongoEnMemoria.stop();
+  }
+});
 
 module.exports = conectarBaseDeDatos;
