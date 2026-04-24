@@ -2,15 +2,19 @@ import React, { useState } from 'react';
 import { ArrowLeft, Lock, Truck, CreditCard, ShieldCheck } from 'lucide-react';
 
 // --- LÓGICA INTEGRADA (Anteriormente en LogicaPaginaCheckout.js) ---
-const useLogicaCheckout = (carrito, setCarrito, setSeccionActual) => {
+const useLogicaCheckout = (carrito, setCarrito, setSeccionActual, apiBaseUrl, usernameActual) => {
   const [paso, setPaso] = useState('envio');
   const [procesando, setProcesando] = useState(false);
 
   const [datos, setDatos] = useState({
     nombre: '',
+    pais: '',
+    correo: '',
+    celular: '',
     direccion: '',
     ciudad: '',
     zip: '',
+    comentarioPedido: '',
     titular: '',
     tarjeta: '',
     exp: '',
@@ -34,12 +38,47 @@ const useLogicaCheckout = (carrito, setCarrito, setSeccionActual) => {
     e.preventDefault();
     setProcesando(true);
 
-    // Simulación de procesamiento de pago
-    await new Promise(resolve => setTimeout(resolve, 2500));
+    try {
+      const respuesta = await fetch(`${apiBaseUrl}/api/tienda/pago`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          username: usernameActual,
+          items: Array.isArray(carrito)
+            ? carrito.map((item) => ({
+                id: item.id,
+                precio: item.precio,
+                tallaSeleccionada: item.tallaSeleccionada,
+                colorSeleccionado: item.colorSeleccionado,
+                cantidad: item.cantidad || 1
+              }))
+            : [],
+          cliente: {
+            nombre: datos.nombre,
+            pais: datos.pais,
+            correo: datos.correo,
+            celular: datos.celular,
+            direccion: datos.direccion,
+            ciudad: datos.ciudad,
+            zip: datos.zip,
+            comentarioPedido: datos.comentarioPedido
+          }
+        })
+      });
 
-    setProcesando(false);
-    if (setCarrito) setCarrito([]); 
-    setSeccionActual('agradecimiento');
+      if (!respuesta.ok) {
+        throw new Error(`Error ${respuesta.status} al procesar el pago`);
+      }
+
+      setProcesando(false);
+      if (setCarrito) setCarrito([]);
+      setSeccionActual('agradecimiento');
+    } catch (error) {
+      console.error('No se pudo procesar el pago en la API.', error);
+      setProcesando(false);
+    }
   };
 
   const volverAtras = () => {
@@ -60,7 +99,8 @@ const useLogicaCheckout = (carrito, setCarrito, setSeccionActual) => {
 };
 
 // --- VISTA COMPONENTE ---
-const PaginaCheckout = ({ carrito = [], setCarrito, setSeccionActual }) => {
+const PaginaCheckout = ({ carrito = [], setCarrito, setSeccionActual, usernameActual }) => {
+  const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const {
     paso,
     datos,
@@ -70,19 +110,19 @@ const PaginaCheckout = ({ carrito = [], setCarrito, setSeccionActual }) => {
     irAPago,
     finalizarCompra,
     volverAtras
-  } = useLogicaCheckout(carrito, setCarrito, setSeccionActual);
+  } = useLogicaCheckout(carrito, setCarrito, setSeccionActual, apiBaseUrl, usernameActual);
 
   return (
-    <div className="min-h-screen bg-white pt-14 pb-10 px-6 text-left">
+    <div className="min-h-screen bg-white pt-20 pb-32 px-6 text-left">
       {/* Cabecera dinámica */}
-      <header className="flex items-center gap-4 mb-8">
-        <button onClick={volverAtras} className="p-2.5 bg-gray-50 rounded-full text-gray-800">
-          <ArrowLeft size={20} />
+      <header className="fixed top-0 left-1/2 z-20 flex w-full max-w-md -translate-x-1/2 items-center gap-3 bg-white/95 px-5 pt-1.5 pb-2 backdrop-blur-md">
+        <button onClick={volverAtras} className="p-2 bg-gray-50 rounded-full text-gray-800 shadow-sm">
+          <ArrowLeft size={18} />
         </button>
-        <h1 className="text-xl font-black text-gray-900">
+        <h1 className="text-lg font-black text-gray-900">
           {paso === 'envio' ? 'Datos de Entrega' : 'Detalles de Pago'}
         </h1>
-        {paso === 'pago' && <Lock size={18} className="ml-auto text-green-600" />}
+        {paso === 'pago' && <Lock size={16} className="ml-auto text-green-600" />}
       </header>
 
       {/* Indicador de progreso */}
@@ -92,25 +132,31 @@ const PaginaCheckout = ({ carrito = [], setCarrito, setSeccionActual }) => {
       </div>
 
       {paso === 'envio' ? (
-        <form onSubmit={irAPago} className="space-y-4">
+        <form onSubmit={irAPago} className="space-y-4 pb-24">
           <div className="bg-blue-50 p-4 rounded-2xl flex items-center gap-3 mb-4 text-blue-700">
             <Truck size={20} />
             <span className="text-[10px] font-black uppercase tracking-widest">Envío Estándar Garantizado</span>
           </div>
           
           <input required name="nombre" value={datos.nombre} onChange={manejarCambio} className="w-full bg-gray-50 p-4 rounded-2xl outline-none font-medium text-sm border border-transparent focus:border-gray-200" placeholder="Nombre completo" />
+          <input required name="pais" value={datos.pais} onChange={manejarCambio} className="w-full bg-gray-50 p-4 rounded-2xl outline-none font-medium text-sm border border-transparent focus:border-gray-200" placeholder="País" />
+          <input required type="email" name="correo" value={datos.correo} onChange={manejarCambio} className="w-full bg-gray-50 p-4 rounded-2xl outline-none font-medium text-sm border border-transparent focus:border-gray-200" placeholder="Correo electrónico" />
+          <input required type="tel" name="celular" value={datos.celular} onChange={manejarCambio} className="w-full bg-gray-50 p-4 rounded-2xl outline-none font-medium text-sm border border-transparent focus:border-gray-200" placeholder="Número de celular" />
           <input required name="direccion" value={datos.direccion} onChange={manejarCambio} className="w-full bg-gray-50 p-4 rounded-2xl outline-none font-medium text-sm border border-transparent focus:border-gray-200" placeholder="Dirección de calle" />
           <div className="flex gap-4">
             <input required name="ciudad" value={datos.ciudad} onChange={manejarCambio} className="flex-[2] bg-gray-50 p-4 rounded-2xl outline-none font-medium text-sm border border-transparent focus:border-gray-200" placeholder="Ciudad" />
             <input required name="zip" value={datos.zip} onChange={manejarCambio} className="flex-1 bg-gray-50 p-4 rounded-2xl outline-none font-medium text-sm border border-transparent focus:border-gray-200" placeholder="ZIP" />
           </div>
+          <textarea name="comentarioPedido" value={datos.comentarioPedido} onChange={manejarCambio} className="w-full min-h-28 resize-none bg-gray-50 p-4 rounded-2xl outline-none font-medium text-sm border border-transparent focus:border-gray-200" placeholder="Comentario para tu pedido (opcional)" />
 
-          <button type="submit" className="w-full bg-black text-white py-5 rounded-[28px] font-black text-lg mt-8 shadow-xl active:scale-95 transition-all">
-            Continuar al pago
-          </button>
+          <div className="fixed bottom-0 left-1/2 z-20 w-full max-w-md -translate-x-1/2 bg-gradient-to-t from-white via-white to-white/0 px-4 pb-4 pt-5">
+            <button type="submit" className="w-full bg-black text-white py-3.5 rounded-[22px] font-black text-sm shadow-xl active:scale-95 transition-all">
+              Continuar al pago
+            </button>
+          </div>
         </form>
       ) : (
-        <form onSubmit={finalizarCompra} className="space-y-4">
+        <form onSubmit={finalizarCompra} className="space-y-4 pb-24">
           {/* Tarjeta Visual */}
           <div className="mb-8 bg-gradient-to-br from-gray-900 to-black p-6 rounded-[28px] text-white shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10" />
@@ -136,13 +182,15 @@ const PaginaCheckout = ({ carrito = [], setCarrito, setSeccionActual }) => {
             <span className="text-[10px] font-bold uppercase tracking-widest">Pago encriptado de 256 bits</span>
           </div>
 
-          <button 
-            type="submit" 
-            disabled={procesando}
-            className="w-full bg-blue-600 text-white py-5 rounded-[28px] font-black text-lg mt-4 shadow-xl shadow-blue-100 active:scale-95 transition-all disabled:bg-gray-200 disabled:text-gray-400"
-          >
-            {procesando ? "Procesando..." : `Pagar $${total.toFixed(2)}`}
-          </button>
+          <div className="fixed bottom-0 left-1/2 z-20 w-full max-w-md -translate-x-1/2 bg-gradient-to-t from-white via-white to-white/0 px-4 pb-4 pt-5">
+            <button 
+              type="submit" 
+              disabled={procesando}
+              className="w-full bg-blue-600 text-white py-3.5 rounded-[22px] font-black text-sm shadow-xl shadow-blue-100 active:scale-95 transition-all disabled:bg-gray-200 disabled:text-gray-400"
+            >
+              {procesando ? "Procesando..." : `Pagar $${total.toFixed(2)}`}
+            </button>
+          </div>
         </form>
       )}
     </div>

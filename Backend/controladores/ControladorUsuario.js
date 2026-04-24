@@ -4,88 +4,144 @@
  * y la configuración de la cuenta.
  */
 
-// Simulación de Base de Datos para Usuarios
-let baseDatosUsuarios = [
-  {
-    id: 1,
-    username: 'cristian_dev',
-    password: 'password123', // En un backend real, esto debe estar encriptado
-    nombre: 'Cristian Rodríguez',
-    bio: 'Desarrollador Fullstack & Emprendedor. Siempre aprendiendo.',
-    foto: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400',
-    seguidores: 45000,
-    siguiendo: 124,
-    likesTotales: '1.2M'
-  }
-];
+const mongoose = require('mongoose');
+const { Pedido, Producto, Publicacion, Usuario } = require('../configuracion/ArquitecturaBaseDeDatos');
+
+const fotoPerfilPorDefecto = 'https://via.placeholder.com/150';
+
+const serializarPublicacionPerfil = (publicacion) => ({
+  id: publicacion._id.toString(),
+  tipoContenido: publicacion.tipo || 'imagen',
+  mediaUrl: publicacion.urlContenido,
+  portada: publicacion.urlContenido,
+  descripcion: publicacion.descripcion || '',
+  likes: Array.isArray(publicacion.likes) ? publicacion.likes.length : 0,
+  comentarios: Number(publicacion.comentariosCount || 0)
+});
+
+const serializarPedidoPerfil = (pedido) => ({
+  id: pedido._id.toString(),
+  fecha: pedido.createdAt,
+  estado: pedido.estado,
+  total: Number(pedido.total || 0),
+  itemsCount: Array.isArray(pedido.items) ? pedido.items.length : 0,
+  primerProducto: pedido.items?.[0]?.nombre || 'Pedido',
+  resumenItems: Array.isArray(pedido.items) ? pedido.items.slice(0, 2).map((item) => item.nombre) : []
+});
 
 // --- FUNCIONES DEL CONTROLADOR ---
 
 /**
  * Obtiene la información del perfil de un usuario por su ID o nombre de usuario
  */
-const obtenerPerfil = (req, res) => {
-  const { username } = req.params;
-  const usuario = baseDatosUsuarios.find(u => u.username === username);
+const obtenerPerfil = async (req, res) => {
+  try {
+    const { username } = req.params;
+    const usuario = await Usuario.findOne({ username }).lean();
 
-  if (!usuario) {
-    return res.status(404).json({ mensaje: "Usuario no encontrado" });
+    if (!usuario) {
+      return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+    }
+
+    const filtroPedidos = {
+      $or: [
+        { username },
+        { 'cliente.correo': usuario.email }
+      ]
+    };
+
+    const [publicacionesRecientes, publicacionesCount, pedidosRecientes, totalCompras, totalGuardados] = await Promise.all([
+      Publicacion.find({ autor: usuario._id }).sort({ createdAt: -1 }).limit(9).lean(),
+      Publicacion.countDocuments({ autor: usuario._id }),
+      Pedido.find(filtroPedidos).sort({ createdAt: -1 }).limit(5).lean(),
+      Pedido.countDocuments(filtroPedidos),
+      Producto.countDocuments({ usuariosQueDieronMeGusta: username })
+    ]);
+
+    const likesTotales = publicacionesRecientes.reduce((acumulado, publicacion) => {
+      return acumulado + (Array.isArray(publicacion.likes) ? publicacion.likes.length : 0);
+    }, 0);
+
+    res.status(200).json({
+      id: usuario._id.toString(),
+      username: usuario.username,
+      nombre: usuario.nombreCompleto,
+      bio: usuario.biografia,
+      foto: usuario.fotoPerfil || fotoPerfilPorDefecto,
+      seguidores: Array.isArray(usuario.seguidores) ? usuario.seguidores.length : 0,
+      siguiendo: Array.isArray(usuario.siguiendo) ? usuario.siguiendo.length : 0,
+      likesTotales,
+      publicacionesCount,
+      totalCompras,
+      totalGuardados,
+      publicacionesRecientes: publicacionesRecientes.map(serializarPublicacionPerfil),
+      pedidosRecientes: pedidosRecientes.map(serializarPedidoPerfil)
+    });
+  } catch (error) {
+    res.status(500).json({ mensaje: 'Error al cargar el perfil', error: error.message });
   }
-
-  // No enviamos la contraseña al frontend por seguridad
-  const { password, ...datosPublicos } = usuario;
-  res.status(200).json(datosPublicos);
 };
 
 /**
  * Procesa el inicio de sesión (Login)
  */
-const iniciarSesion = (req, res) => {
-  const { username, password } = req.body;
+const iniciarSesion = async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const usuario = await Usuario.findOne({ username });
 
-  const usuario = baseDatosUsuarios.find(u => u.username === username);
+    if (!usuario || usuario.password !== password) {
+      return res.status(401).json({ mensaje: 'Credenciales incorrectas' });
+    }
 
-  if (!usuario || usuario.password !== password) {
-    return res.status(401).json({ mensaje: "Credenciales incorrectas" });
+    res.status(200).json({
+      mensaje: 'Inicio de sesión exitoso',
+      usuario: {
+        id: usuario._id.toString(),
+        username: usuario.username,
+        nombre: usuario.nombreCompleto
+      },
+      token: 'token-simulado-xyz-123'
+    });
+  } catch (error) {
+    res.status(500).json({ mensaje: 'Error al iniciar sesión', error: error.message });
   }
-
-  // En un sistema real, aquí generaríamos un JWT (Token)
-  res.status(200).json({
-    mensaje: "Inicio de sesión exitoso",
-    usuario: {
-      id: usuario.id,
-      username: usuario.username,
-      nombre: usuario.nombre
-    },
-    token: "token-simulado-xyz-123"
-  });
 };
 
 /**
  * Actualiza la información del perfil del usuario
  */
-const actualizarPerfil = (req, res) => {
-  const { id } = req.params;
-  const { nombre, bio, foto } = req.body;
+const actualizarPerfil = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nombre, bio, foto } = req.body;
 
-  const indice = baseDatosUsuarios.findIndex(u => u.id === parseInt(id));
+    const filtro = mongoose.Types.ObjectId.isValid(id) ? { _id: id } : { username: id };
+    const usuario = await Usuario.findOne(filtro);
 
-  if (indice === -1) {
-    return res.status(404).json({ mensaje: "Usuario no encontrado para actualizar" });
+    if (!usuario) {
+      return res.status(404).json({ mensaje: 'Usuario no encontrado para actualizar' });
+    }
+
+    usuario.nombreCompleto = String(nombre || usuario.nombreCompleto).trim();
+    usuario.biografia = String(bio || usuario.biografia).trim();
+    usuario.fotoPerfil = String(foto || usuario.fotoPerfil).trim();
+
+    await usuario.save();
+
+    res.status(200).json({
+      mensaje: 'Perfil actualizado con éxito',
+      usuario: {
+        id: usuario._id.toString(),
+        username: usuario.username,
+        nombre: usuario.nombreCompleto,
+        bio: usuario.biografia,
+        foto: usuario.fotoPerfil
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ mensaje: 'Error al actualizar el perfil', error: error.message });
   }
-
-  // Actualizamos solo los campos permitidos
-  baseDatosUsuarios[indice] = {
-    ...baseDatosUsuarios[indice],
-    nombre: nombre || baseDatosUsuarios[indice].nombre,
-    bio: bio || baseDatosUsuarios[indice].bio,
-    foto: foto || baseDatosUsuarios[indice].foto
-  };
-
-  res.status(200).json({
-    mensaje: "Perfil actualizado con éxito",
-    usuario: baseDatosUsuarios[indice]
-  });
 };
 
 module.exports = {

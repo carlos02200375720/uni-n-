@@ -32,7 +32,7 @@ const useLogicaCarrito = (carrito = [], setCarrito, setSeccionActual) => {
   // Navegación
   const procederAlEnvio = () => {
     if (listaSegura.length > 0 && setSeccionActual) {
-      setSeccionActual('envio');
+      setSeccionActual('checkout');
     }
   };
 
@@ -69,17 +69,17 @@ export const PaginaCarrito = ({ carrito = [], setCarrito, setSeccionActual }) =>
   } = useLogicaCarrito(carrito, setCarrito, setSeccionActual);
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] pt-14 pb-10 px-6 animate-in fade-in duration-500">
+    <div className="min-h-screen bg-[#FAFAFA] pt-16 pb-36 px-6 animate-in fade-in duration-500">
       {/* Cabecera */}
-      <header className="flex items-center justify-between mb-8">
+      <header className="fixed top-0 left-1/2 z-20 flex w-full max-w-md -translate-x-1/2 items-center justify-between bg-[#FAFAFA]/95 px-5 pt-1.5 pb-2 backdrop-blur-md">
         <button 
           onClick={seguirComprando} 
-          className="p-2.5 bg-white shadow-sm rounded-full text-gray-800 active:scale-90 transition-all"
+          className="p-2 bg-white shadow-sm rounded-full text-gray-800 active:scale-90 transition-all"
         >
-          <ArrowLeft size={20} />
+          <ArrowLeft size={18} />
         </button>
-        <h1 className="text-xl font-black text-gray-900">Mi Bolsa</h1>
-        <div className="w-10"></div>
+        <h1 className="text-lg font-black text-gray-900">Mi Bolsa</h1>
+        <div className="w-9"></div>
       </header>
 
       {listaSegura.length === 0 ? (
@@ -149,15 +149,19 @@ export const PaginaCarrito = ({ carrito = [], setCarrito, setSeccionActual }) =>
             </div>
           </div>
 
-          {/* Botón Final */}
+        </>
+      )}
+
+      {listaSegura.length > 0 && (
+        <div className="fixed bottom-0 left-1/2 z-20 w-full max-w-md -translate-x-1/2 bg-gradient-to-t from-[#FAFAFA] via-[#FAFAFA] to-[#FAFAFA]/0 px-4 pb-4 pt-5">
           <button 
             onClick={procederAlEnvio}
-            className="w-full bg-black text-white py-5 rounded-[28px] font-black text-lg flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all"
+            className="w-full bg-black text-white py-3.5 rounded-[22px] font-black text-sm flex items-center justify-center gap-2.5 shadow-xl active:scale-95 transition-all"
           >
             Pagar ahora
-            <ChevronRight size={20} />
+            <ChevronRight size={18} />
           </button>
-        </>
+        </div>
       )}
     </div>
   );

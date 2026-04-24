@@ -54,9 +54,11 @@ const ProductoSchema = new mongoose.Schema({
   categoria: { 
     type: String, 
     required: true, 
-    enum: ['Móviles', 'Audio', 'Laptops', 'Relojes', 'Accesorios'] 
+    enum: ['Móviles', 'Audio', 'Laptops', 'Relojes', 'Accesorios', 'Calzado'] 
   },
   imagenes: [{ type: String }],
+  tallas: { type: [String], default: [] },
+  colores: { type: [String], default: [] },
   stock: { type: Number, default: 0 },
   etiquetas: [String], // Para vinculación con intereses del usuario
   rating: { type: Number, default: 5 }
@@ -86,6 +88,35 @@ const MensajeSchema = new mongoose.Schema({
   tipo: { type: String, enum: ['texto', 'producto', 'imagen'], default: 'texto' }
 }, { timestamps: true });
 
+const PedidoSchema = new mongoose.Schema({
+  username: { type: String, default: '', trim: true, index: true },
+  items: {
+    type: [
+      {
+        productoId: { type: String, required: true },
+        nombre: { type: String, required: true },
+        precio: { type: Number, required: true, min: 0 },
+        talla: { type: String, default: '' },
+        color: { type: String, default: '' },
+        cantidad: { type: Number, default: 1, min: 1 }
+      }
+    ],
+    default: []
+  },
+  cliente: {
+    nombre: { type: String, required: true, trim: true },
+    pais: { type: String, required: true, trim: true },
+    correo: { type: String, required: true, trim: true, lowercase: true },
+    celular: { type: String, required: true, trim: true },
+    direccion: { type: String, required: true, trim: true },
+    ciudad: { type: String, required: true, trim: true },
+    zip: { type: String, required: true, trim: true },
+    comentarioPedido: { type: String, default: '', trim: true }
+  },
+  total: { type: Number, required: true, min: 0 },
+  estado: { type: String, default: 'pendiente', enum: ['pendiente', 'pagado', 'cancelado'] }
+}, { timestamps: true });
+
 // ==========================================
 // EXPORTACIÓN Y REGISTRO AUTOMÁTICO
 // ==========================================
@@ -95,6 +126,7 @@ const Usuario = mongoose.model('Usuario', UsuarioSchema);
 const Producto = mongoose.model('Producto', ProductoSchema);
 const Publicacion = mongoose.model('Publicacion', PublicacionSchema);
 const Mensaje = mongoose.model('Mensaje', MensajeSchema);
+const Pedido = mongoose.model('Pedido', PedidoSchema);
 
 console.log("🛠️  Arquitectura de Base de Datos cargada y lista para sincronizar.");
 
@@ -102,5 +134,6 @@ module.exports = {
   Usuario,
   Producto,
   Publicacion,
-  Mensaje
+  Mensaje,
+  Pedido
 };

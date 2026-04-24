@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, MessageCircle, Share2, Play } from 'lucide-react';
+import { Heart, MessageCircle, Share2 } from 'lucide-react';
 import { useLogicaSocial } from './LogicaPaginaInicioSocial';
 
 const publicacionesPorDefecto = [
@@ -29,53 +29,57 @@ export const PaginaInicioSocial = ({ publicaciones = [] }) => {
 
 	return (
 		<section className="min-h-screen bg-black text-white pb-24">
-			<header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-black/80 backdrop-blur-md border-b border-white/10">
-				<div>
-					<p className="text-[10px] uppercase tracking-[0.3em] text-white/40">Feed</p>
-					<h1 className="text-xl font-black tracking-tight">Red social</h1>
-				</div>
-				<div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-					<Play size={18} />
-				</div>
-			</header>
-
-			<div className="space-y-6 px-4 pt-4">
+			<div className="space-y-0">
 				{feed.map((publicacion) => (
-					<article key={publicacion.id} className="overflow-hidden rounded-[32px] border border-white/10 bg-white/5 shadow-2xl">
+					<article key={publicacion.id} className="w-full overflow-hidden border-b border-white/10 bg-black">
 						<div className="aspect-[4/5] relative">
-							<img
-								src={publicacion.portada}
-								alt={publicacion.usuario}
-								className="w-full h-full object-cover"
-							/>
+							{publicacion.tipoContenido === 'video' ? (
+								<video
+									src={publicacion.mediaUrl || publicacion.portada}
+									className="w-full h-full object-cover"
+									autoPlay
+									muted
+									loop
+									playsInline
+								/>
+							) : (
+								<img
+									src={publicacion.mediaUrl || publicacion.portada}
+									alt={publicacion.usuario}
+									className="w-full h-full object-cover"
+								/>
+							)}
 							<div className="absolute inset-0 bg-gradient-to-t from-black via-black/10 to-transparent" />
-							<div className="absolute left-5 right-5 bottom-5">
+							<div className="absolute right-4 bottom-6 z-10 flex flex-col items-center gap-5 text-white">
+								<button
+									onClick={() => darLike(publicacion.id)}
+									className="flex flex-col items-center gap-1 text-white/90 active:scale-95 transition-transform"
+								>
+									<span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/30 backdrop-blur-sm">
+										<Heart size={22} fill={publicacion.usuarioDioLike ? 'currentColor' : 'none'} />
+									</span>
+									<span className="text-xs font-bold">{publicacion.likes}</span>
+								</button>
+								<div className="flex flex-col items-center gap-1 text-white/80">
+									<span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/30 backdrop-blur-sm">
+										<MessageCircle size={22} />
+									</span>
+									<span className="text-xs font-bold">{publicacion.comentarios}</span>
+								</div>
+								<button
+									onClick={() => compartirPublicacion(publicacion)}
+									className="flex flex-col items-center gap-1 text-white/80 active:scale-95 transition-transform"
+								>
+									<span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/30 backdrop-blur-sm">
+										<Share2 size={22} />
+									</span>
+									<span className="text-xs font-bold">Compartir</span>
+								</button>
+							</div>
+							<div className="absolute left-5 right-24 bottom-5">
 								<p className="text-sm font-black mb-2">@{publicacion.usuario}</p>
 								<p className="text-sm text-white/80 leading-relaxed">{publicacion.descripcion}</p>
 							</div>
-						</div>
-
-						<div className="flex items-center justify-between px-5 py-4 text-sm">
-							<div className="flex items-center gap-5">
-								<button
-									onClick={() => darLike(publicacion.id)}
-									className="flex items-center gap-2 text-white/85 active:scale-95 transition-transform"
-								>
-									<Heart size={18} fill={publicacion.usuarioDioLike ? 'currentColor' : 'none'} />
-									<span>{publicacion.likes}</span>
-								</button>
-								<div className="flex items-center gap-2 text-white/70">
-									<MessageCircle size={18} />
-									<span>{publicacion.comentarios}</span>
-								</div>
-							</div>
-							<button
-								onClick={() => compartirPublicacion(publicacion)}
-								className="flex items-center gap-2 text-white/70 active:scale-95 transition-transform"
-							>
-								<Share2 size={18} />
-								<span>Compartir</span>
-							</button>
 						</div>
 					</article>
 				))}

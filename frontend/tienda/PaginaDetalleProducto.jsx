@@ -10,6 +10,16 @@ const useLogicaDetalle = (producto, carrito, setCarrito, setSeccionActual, setPr
   const [comprando, setComprando] = useState(false);
   const [comentarioTexto, setComentarioTexto] = useState('');
   const [enviandoComentario, setEnviandoComentario] = useState(false);
+  const [tallaSeleccionada, setTallaSeleccionada] = useState('');
+  const [colorSeleccionado, setColorSeleccionado] = useState('');
+
+  React.useEffect(() => {
+    const tallasDisponibles = Array.isArray(producto?.tallas) ? producto.tallas : [];
+    const coloresDisponibles = Array.isArray(producto?.colores) ? producto.colores : [];
+
+    setTallaSeleccionada(tallasDisponibles[0] || '');
+    setColorSeleccionado(coloresDisponibles[0] || '');
+  }, [producto?.id]);
 
   // Función para volver atrás al catálogo
   const volverAtras = () => {
@@ -32,6 +42,8 @@ const useLogicaDetalle = (producto, carrito, setCarrito, setSeccionActual, setPr
     // Creamos una copia única del producto para el carrito
     const nuevoItem = { 
       ...producto, 
+      tallaSeleccionada,
+      colorSeleccionado,
       tempId: Date.now() // ID temporal para manejar duplicados en el carrito
     };
 
@@ -58,6 +70,8 @@ const useLogicaDetalle = (producto, carrito, setCarrito, setSeccionActual, setPr
 
     const itemCompraDirecta = {
       ...producto,
+      tallaSeleccionada,
+      colorSeleccionado,
       tempId: Date.now()
     };
 
@@ -99,7 +113,11 @@ const useLogicaDetalle = (producto, carrito, setCarrito, setSeccionActual, setPr
     comprando,
     comentarioTexto,
     enviandoComentario,
+    tallaSeleccionada,
+    colorSeleccionado,
     setComentarioTexto,
+    setTallaSeleccionada,
+    setColorSeleccionado,
     volverAtras,
     irAlCarrito,
     añadirAlCarrito,
@@ -114,7 +132,7 @@ const useLogicaDetalle = (producto, carrito, setCarrito, setSeccionActual, setPr
  */
 export const PaginaDetalleProducto = ({ producto, carrito, setCarrito, setSeccionActual, setProductoSeleccionado, agregarComentarioProducto }) => {
   // Conectamos la lógica interna definida arriba
-  const { agregando, comprando, comentarioTexto, enviandoComentario, setComentarioTexto, volverAtras, irAlCarrito, añadirAlCarrito, comprarAhora, enviarComentario } = useLogicaDetalle(
+  const { agregando, comprando, comentarioTexto, enviandoComentario, tallaSeleccionada, colorSeleccionado, setComentarioTexto, setTallaSeleccionada, setColorSeleccionado, volverAtras, irAlCarrito, añadirAlCarrito, comprarAhora, enviarComentario } = useLogicaDetalle(
     producto, 
     carrito, 
     setCarrito, 
@@ -186,14 +204,14 @@ export const PaginaDetalleProducto = ({ producto, carrito, setCarrito, setSeccio
       <div className="fixed top-3 left-1/2 z-30 flex w-full max-w-md -translate-x-1/2 items-start justify-between px-6 pointer-events-none">
         <button 
           onClick={volverAtras} 
-          className="pointer-events-auto bg-white/20 backdrop-blur-xl p-2 rounded-full text-white border border-white/30 shadow-lg active:scale-90 transition-all"
+          className="pointer-events-auto bg-white/20 backdrop-blur-xl p-2 rounded-full text-black border border-white/30 shadow-lg active:scale-90 transition-all"
         >
           <ArrowLeft size={20} />
         </button>
 
         <button
           onClick={irAlCarrito}
-          className="pointer-events-auto relative bg-white/20 backdrop-blur-xl p-2 rounded-full text-white border border-white/30 shadow-lg active:scale-90 transition-all"
+          className="pointer-events-auto relative bg-white/20 backdrop-blur-xl p-2 rounded-full text-black border border-white/30 shadow-lg active:scale-90 transition-all"
         >
           <ShoppingCart size={20} />
           {Array.isArray(carrito) && carrito.length > 0 && (
@@ -235,6 +253,52 @@ export const PaginaDetalleProducto = ({ producto, carrito, setCarrito, setSeccio
             <span className="text-[10px] font-bold text-green-800 leading-none">Entrega <br/>Inmediata</span>
           </div>
         </div>
+
+        {(Array.isArray(producto.tallas) && producto.tallas.length > 0) || (Array.isArray(producto.colores) && producto.colores.length > 0) ? (
+          <section className="mb-12 space-y-6">
+            {Array.isArray(producto.tallas) && producto.tallas.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Talla</h3>
+                  {tallaSeleccionada && <span className="text-xs font-bold text-gray-400">Seleccionada: {tallaSeleccionada}</span>}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {producto.tallas.map((talla) => (
+                    <button
+                      key={`${producto.id}-talla-${talla}`}
+                      type="button"
+                      onClick={() => setTallaSeleccionada(talla)}
+                      className={`min-w-12 rounded-2xl border px-4 py-3 text-sm font-black transition-all active:scale-95 ${tallaSeleccionada === talla ? 'border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-100' : 'border-gray-200 bg-white text-gray-700'}`}
+                    >
+                      {talla}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {Array.isArray(producto.colores) && producto.colores.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Color</h3>
+                  {colorSeleccionado && <span className="text-xs font-bold text-gray-400">Seleccionado: {colorSeleccionado}</span>}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {producto.colores.map((color) => (
+                    <button
+                      key={`${producto.id}-color-${color}`}
+                      type="button"
+                      onClick={() => setColorSeleccionado(color)}
+                      className={`rounded-2xl border px-4 py-3 text-sm font-black transition-all active:scale-95 ${colorSeleccionado === color ? 'border-gray-900 bg-gray-900 text-white shadow-lg shadow-gray-200' : 'border-gray-200 bg-white text-gray-700'}`}
+                    >
+                      {color}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+        ) : null}
 
         <div className="mb-12">
           <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest mb-4">Descripción</h3>

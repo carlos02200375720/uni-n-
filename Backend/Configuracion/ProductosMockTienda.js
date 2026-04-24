@@ -137,6 +137,28 @@ const productosMockTienda = [
       'https://images.unsplash.com/photo-1517420879524-86d64ac2f339?w=900'
     ],
     imagen: 'https://images.unsplash.com/photo-1585338107529-13afc5f02586?w=500'
+  },
+  {
+    id: 8,
+    nombre: 'Tenis Urban Flex',
+    descripcion: 'Producto de prueba para visualizar un flujo de compra con selección de talla y color antes de añadir al carrito o comprar.',
+    precio: 89,
+    precioOriginal: 119,
+    descuento: 25,
+    oferta: true,
+    likesCount: 51,
+    comentariosCount: 7,
+    stock: 14,
+    categoria: 'Calzado',
+    etiquetas: ['calzado', 'urbano', 'variantes'],
+    tallas: ['38', '39', '40', '41', '42'],
+    colores: ['Negro', 'Blanco', 'Rojo'],
+    imagenes: [
+      'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=900',
+      'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=900',
+      'https://images.unsplash.com/photo-1600185365483-26d7a4cc7519?w=900'
+    ],
+    imagen: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500'
   }
 ];
 

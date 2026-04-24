@@ -5,10 +5,43 @@ import { ArrowLeft, Send, MoreVertical, Smile, Paperclip, Phone, Video } from 'l
  * Lógica interna del componente de Chat Individual
  * Maneja el estado de los mensajes, el envío y el scroll automático.
  */
-const useLogicaVentanaChat = (chatSeleccionado, setChatSeleccionado) => {
+const useLogicaVentanaChat = (chatSeleccionado, setChatSeleccionado, usernameActual, apiBaseUrl) => {
   const [mensajeTexto, setMensajeTexto] = useState('');
-  const [mensajes, setMensajes] = useState(chatSeleccionado?.mensajes || []);
+  const [mensajes, setMensajes] = useState([]);
   const scrollRef = useRef(null);
+
+  useEffect(() => {
+    if (!chatSeleccionado?.id || !usernameActual) {
+      setMensajes([]);
+      return;
+    }
+
+    let activo = true;
+
+    const cargarMensajes = async () => {
+      try {
+        const respuesta = await fetch(`${apiBaseUrl}/api/chat/mensajes/${chatSeleccionado.id}?username=${encodeURIComponent(usernameActual)}`);
+
+        if (!respuesta.ok) {
+          throw new Error(`Error ${respuesta.status} al cargar mensajes`);
+        }
+
+        const datos = await respuesta.json();
+
+        if (activo && Array.isArray(datos)) {
+          setMensajes(datos);
+        }
+      } catch (error) {
+        console.error('No se pudieron cargar los mensajes desde la API.', error);
+      }
+    };
+
+    cargarMensajes();
+
+    return () => {
+      activo = false;
+    };
+  }, [apiBaseUrl, chatSeleccionado?.id, usernameActual]);
 
   // Desplazamiento automático al final cuando hay mensajes nuevos
   useEffect(() => {
@@ -21,30 +54,46 @@ const useLogicaVentanaChat = (chatSeleccionado, setChatSeleccionado) => {
     setChatSeleccionado(null);
   };
 
-  const enviarMensaje = (e) => {
+  const enviarMensaje = async (e) => {
     e.preventDefault();
-    if (!mensajeTexto.trim()) return;
+    if (!mensajeTexto.trim() || !chatSeleccionado?.id || !usernameActual) return;
+
+    const texto = mensajeTexto.trim();
 
     const nuevoMensaje = {
-      id: Date.now(),
-      texto: mensajeTexto,
+      id: `temp-${Date.now()}`,
+      texto,
       remitente: 'yo',
       hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
-    setMensajes([...mensajes, nuevoMensaje]);
+    setMensajes((prev) => [...prev, nuevoMensaje]);
     setMensajeTexto('');
 
-    // Simulación de respuesta automática
-    setTimeout(() => {
-      const respuesta = {
-        id: Date.now() + 1,
-        texto: "¡Entendido! Te respondo en un momento. 👍",
-        remitente: 'otro',
-        hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      setMensajes(prev => [...prev, respuesta]);
-    }, 1500);
+    try {
+      const respuesta = await fetch(`${apiBaseUrl}/api/chat/enviar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          receptorId: chatSeleccionado.id,
+          texto,
+          username: usernameActual
+        })
+      });
+
+      if (!respuesta.ok) {
+        throw new Error(`Error ${respuesta.status} al enviar el mensaje`);
+      }
+
+      const datos = await respuesta.json();
+      setMensajes((prev) => prev.map((mensaje) => mensaje.id === nuevoMensaje.id ? datos.data : mensaje));
+    } catch (error) {
+      console.error('No se pudo enviar el mensaje en la API.', error);
+      setMensajes((prev) => prev.filter((mensaje) => mensaje.id !== nuevoMensaje.id));
+      setMensajeTexto(texto);
+    }
   };
 
   return {
@@ -60,7 +109,7 @@ const useLogicaVentanaChat = (chatSeleccionado, setChatSeleccionado) => {
 /**
  * Componente Visual de la Ventana de Chat
  */
-export const VentanaChat = ({ chatSeleccionado, setChatSeleccionado }) => {
+export const VentanaChat = ({ chatSeleccionado, setChatSeleccionado, usernameActual, apiBaseUrl }) => {
   const {
     mensajeTexto,
     setMensajeTexto,
@@ -68,7 +117,7 @@ export const VentanaChat = ({ chatSeleccionado, setChatSeleccionado }) => {
     scrollRef,
     cerrarChat,
     enviarMensaje
-  } = useLogicaVentanaChat(chatSeleccionado, setChatSeleccionado);
+  } = useLogicaVentanaChat(chatSeleccionado, setChatSeleccionado, usernameActual, apiBaseUrl);
 
   if (!chatSeleccionado) return null;
 
@@ -97,7 +146,7 @@ export const VentanaChat = ({ chatSeleccionado, setChatSeleccionado }) => {
         <div className="flex-1 text-left overflow-hidden">
           <h3 className="font-bold text-sm text-gray-900 truncate">{chatSeleccionado.nombre}</h3>
           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-            {chatSeleccionado.online ? 'En línea' : 'Escribiendo...'}
+            {chatSeleccionado.online ? 'En línea' : 'Disponible'}
           </p>
         </div>
 

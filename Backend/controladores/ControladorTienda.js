@@ -4,14 +4,14 @@
  */
 
 const productosMockTienda = require('../configuracion/ProductosMockTienda');
-const { Producto } = require('../configuracion/ArquitecturaBaseDeDatos');
+const { Pedido, Producto } = require('../configuracion/ArquitecturaBaseDeDatos');
 const mongoose = require('mongoose');
 
 // Datos simulados (Base de datos temporal)
 let inventario = [...productosMockTienda];
 
 const imagenPorDefecto = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500';
-const categoriasPermitidas = ['Móviles', 'Audio', 'Laptops', 'Relojes', 'Accesorios'];
+const categoriasPermitidas = ['Móviles', 'Audio', 'Laptops', 'Relojes', 'Accesorios', 'Calzado'];
 
 const normalizarCategoriaProducto = (categoria = '') => {
   const categoriaLimpia = String(categoria)
@@ -29,7 +29,11 @@ const normalizarCategoriaProducto = (categoria = '') => {
     relojes: 'Relojes',
     reloj: 'Relojes',
     accesorios: 'Accesorios',
-    accesorio: 'Accesorios'
+    accesorio: 'Accesorios',
+    calzado: 'Calzado',
+    tenis: 'Calzado',
+    zapato: 'Calzado',
+    zapatos: 'Calzado'
   };
 
   return mapaCategorias[categoriaLimpia] || String(categoria || '').trim();
@@ -65,6 +69,7 @@ const serializarProducto = (producto, username = '') => {
     id: producto._id ? producto._id.toString() : String(producto.id),
     nombre: producto.nombre,
     descripcion: producto.descripcion,
+    desc: producto.descripcion,
     precio,
     precioOriginal,
     descuento: descuentoCalculado,
@@ -76,6 +81,8 @@ const serializarProducto = (producto, username = '') => {
     stock: producto.stock,
     imagen: imagenes[0],
     imagenes,
+    tallas: Array.isArray(producto.tallas) ? producto.tallas : [],
+    colores: Array.isArray(producto.colores) ? producto.colores : [],
     comentarios: comentarios.map((comentario) => ({
       usuario: comentario.usuario,
       texto: comentario.texto,
@@ -129,6 +136,12 @@ const construirPayloadProducto = (datosProducto = {}) => {
       ? datosProducto.etiquetas.filter((etiqueta) => typeof etiqueta === 'string' && etiqueta.trim())
       : [],
     imagenes,
+    tallas: Array.isArray(datosProducto.tallas)
+      ? datosProducto.tallas.filter((talla) => typeof talla === 'string' && talla.trim())
+      : [],
+    colores: Array.isArray(datosProducto.colores)
+      ? datosProducto.colores.filter((color) => typeof color === 'string' && color.trim())
+      : [],
     likesCount: Number(datosProducto.likesCount ?? 0),
     comentariosCount: Number(datosProducto.comentariosCount ?? 0),
     usuariosQueDieronMeGusta: Array.isArray(datosProducto.usuariosQueDieronMeGusta)
@@ -288,33 +301,88 @@ const agregarComentarioProducto = async (req, res) => {
 
 // Validar y procesar la compra
 const procesarPago = async (req, res) => {
-  const { items } = req.body;
+  const { items, cliente = {}, username = '' } = req.body;
 
   if (!items || items.length === 0) {
     return res.status(400).json({ mensaje: "El carrito está vacío" });
+  }
+
+  const camposClienteObligatorios = ['nombre', 'pais', 'correo', 'celular', 'direccion', 'ciudad', 'zip'];
+  const faltaCampoCliente = camposClienteObligatorios.find((campo) => !String(cliente[campo] || '').trim());
+
+  if (faltaCampoCliente) {
+    return res.status(400).json({ mensaje: `El campo ${faltaCampoCliente} es obligatorio` });
   }
 
   try {
     const ids = items.map((item) => item.id).filter(Boolean);
     const idsValidos = ids.filter((id) => mongoose.Types.ObjectId.isValid(id));
     let totalCalculado = 0;
+    let itemsNormalizados = [];
 
     if (idsValidos.length > 0) {
       const productos = await Producto.find({ _id: { $in: idsValidos } }).lean();
-      totalCalculado = productos.reduce((acumulado, producto) => acumulado + producto.precio, 0);
+      const mapaProductos = new Map(productos.map((producto) => [producto._id.toString(), producto]));
+
+      itemsNormalizados = items.map((item) => {
+        const producto = mapaProductos.get(String(item.id));
+        if (!producto) {
+          return null;
+        }
+
+        const cantidad = Number(item.cantidad ?? 1) || 1;
+        const subtotalItem = producto.precio * cantidad;
+        totalCalculado += subtotalItem;
+
+        return {
+          productoId: producto._id.toString(),
+          nombre: producto.nombre,
+          precio: producto.precio,
+          talla: String(item.tallaSeleccionada || item.talla || '').trim(),
+          color: String(item.colorSeleccionado || item.color || '').trim(),
+          cantidad
+        };
+      }).filter(Boolean);
     } else {
       items.forEach((item) => {
         const producto = inventario.find((prod) => String(prod.id) === String(item.id));
         if (producto) {
-          totalCalculado += producto.precio;
+          const cantidad = Number(item.cantidad ?? 1) || 1;
+          totalCalculado += producto.precio * cantidad;
+          itemsNormalizados.push({
+            productoId: String(producto.id),
+            nombre: producto.nombre,
+            precio: producto.precio,
+            talla: String(item.tallaSeleccionada || item.talla || '').trim(),
+            color: String(item.colorSeleccionado || item.color || '').trim(),
+            cantidad
+          });
         }
       });
     }
 
+    const pedido = await Pedido.create({
+      username: String(username || '').trim(),
+      items: itemsNormalizados,
+      cliente: {
+        nombre: String(cliente.nombre || '').trim(),
+        pais: String(cliente.pais || '').trim(),
+        correo: String(cliente.correo || '').trim(),
+        celular: String(cliente.celular || '').trim(),
+        direccion: String(cliente.direccion || '').trim(),
+        ciudad: String(cliente.ciudad || '').trim(),
+        zip: String(cliente.zip || '').trim(),
+        comentarioPedido: String(cliente.comentarioPedido || '').trim()
+      },
+      total: totalCalculado,
+      estado: 'pagado'
+    });
+
     res.status(200).json({
       mensaje: "Pago procesado con éxito",
-      idOrden: "ORD-" + Math.random().toString(36).substr(2, 7).toUpperCase(),
-      total: totalCalculado
+      idOrden: pedido._id.toString(),
+      total: totalCalculado,
+      pedido
     });
   } catch (error) {
     res.status(500).json({ mensaje: 'Error al procesar el pago', error: error.message });
