@@ -32,7 +32,7 @@ const BarraNavegacion = ({ seccionActual = 'tienda', setSeccionActual = () => {}
   const { opciones, manejarCambio } = useLogicaNavegacion(seccionActual, setSeccionActual);
   const esVistaSocial = seccionActual === 'social';
   const tamanoIcono = 18;
-  const clasesContenedor = 'w-full max-w-md flex justify-around items-center pointer-events-auto rounded-none py-1';
+  const clasesContenedor = 'w-full max-w-md flex justify-around items-center pointer-events-auto rounded-t-[28px] py-1';
   const clasesBoton = 'flex flex-col items-center relative gap-0.5 py-1 px-2.5 transition-all duration-300 active:scale-75 outline-none';
   const clasesEtiqueta = 'font-black uppercase tracking-tight leading-none transition-colors text-[8px]';
 
@@ -52,7 +52,7 @@ const BarraNavegacion = ({ seccionActual = 'tienda', setSeccionActual = () => {}
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-[100] flex justify-center pb-0 px-0 pointer-events-none">
-      <div className={`${clasesContenedor} ${esVistaSocial ? 'bg-black border-t border-white/10 shadow-[0_-12px_30px_-18px_rgba(0,0,0,0.95)]' : 'bg-white/80 backdrop-blur-xl border border-white/20 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]'}`}>
+      <div className={`${clasesContenedor} ${esVistaSocial ? 'bg-black border-t border-white/10 shadow-[0_-12px_30px_-18px_rgba(0,0,0,0.95)]' : 'bg-white border border-gray-100 shadow-[0_-10px_32px_-18px_rgba(15,23,42,0.18)]'}`}>
         {opciones.map((opcion) => {
           const activo = seccionActual === opcion.id;
           

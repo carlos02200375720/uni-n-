@@ -17,6 +17,15 @@ const UsuarioSchema = new mongoose.Schema({
   nombreCompleto: { type: String, required: true },
   biografia: { type: String, default: '¡Hola! Estoy usando la red social tech.' },
   fotoPerfil: { type: String, default: 'https://via.placeholder.com/150' },
+  archivosPerfil: {
+    type: [
+      {
+        url: { type: String, required: true },
+        tipo: { type: String, enum: ['imagen', 'video'], required: true }
+      }
+    ],
+    default: []
+  },
   
   // Datos para el Algoritmo de Recomendación
   intereses: { type: [String], default: [] }, // Ej: ['ia', 'gadgets', 'apple']
@@ -24,6 +33,12 @@ const UsuarioSchema = new mongoose.Schema({
   // Relaciones Sociales
   seguidores: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' }],
   siguiendo: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' }],
+  
+  // Publicaciones sociales que le han gustado al usuario
+  publicacionesQueDieronMeGusta: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Publicacion', default: [] }],
+  
+  // Publicaciones sociales que NO le han gustado al usuario (para el algoritmo de recomendación)
+  publicacionesQueNoLeGustaron: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Publicacion', default: [] }],
   
   fechaRegistro: { type: Date, default: Date.now }
 }, { timestamps: true });
@@ -54,7 +69,7 @@ const ProductoSchema = new mongoose.Schema({
   categoria: { 
     type: String, 
     required: true, 
-    enum: ['Móviles', 'Audio', 'Laptops', 'Relojes', 'Accesorios', 'Calzado'] 
+    enum: ['Móviles', 'Audio', 'Laptops', 'Relojes', 'Accesorios', 'Calzado', 'Ropa', 'Hogar'] 
   },
   imagenes: [{ type: String }],
   tallas: { type: [String], default: [] },
@@ -74,6 +89,17 @@ const PublicacionSchema = new mongoose.Schema({
   descripcion: { type: String, maxlength: 500 },
   hashtags: [String],
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' }],
+  dislikes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' }],
+  comentarios: {
+    type: [
+      {
+        usuario: { type: String, required: true, trim: true },
+        texto: { type: String, required: true, trim: true, maxlength: 500 },
+        fecha: { type: Date, default: Date.now }
+      }
+    ],
+    default: []
+  },
   comentariosCount: { type: Number, default: 0 }
 }, { timestamps: true });
 

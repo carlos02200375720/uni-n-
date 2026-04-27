@@ -1,19 +1,40 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export const useLogicaTienda = (productosIniciales, setProductoSeleccionado, setSeccionActual) => {
+
   const [busqueda, setBusqueda] = useState('');
   const [categoriaActual, setCategoriaActual] = useState('Todos');
+  const [productosFiltrados, setProductosFiltrados] = useState(Array.isArray(productosIniciales) ? productosIniciales : []);
+  const debounceRef = useRef();
 
-  const productosSeguros = Array.isArray(productosIniciales) ? productosIniciales : [];
+  useEffect(() => {
+    // Si el buscador está vacío y la categoría es 'Todos', mostrar los productos originales
+    if (!busqueda.trim() && (!categoriaActual || categoriaActual === 'Todos')) {
+      setProductosFiltrados(Array.isArray(productosIniciales) ? productosIniciales : []);
+      return;
+    }
 
-  // Función para filtrar productos por nombre y categoría
-  const productosFiltrados = productosSeguros.filter(producto => {
-    const coincideBusqueda = producto.nombre.toLowerCase().includes(busqueda.toLowerCase());
-    const coincideCategoria = categoriaActual === 'Todos' || producto.categoria === categoriaActual;
-    return coincideBusqueda && coincideCategoria;
-  });
+    // Cancelar debounce anterior
+    if (debounceRef.current) clearTimeout(debounceRef.current);
 
-  const productosEnOferta = productosSeguros
+    debounceRef.current = setTimeout(() => {
+      const params = new URLSearchParams();
+      if (busqueda.trim()) params.append('nombre', busqueda.trim());
+      if (categoriaActual && categoriaActual !== 'Todos') params.append('categoria', categoriaActual);
+      fetch(`/api/tienda/productos?${params.toString()}`)
+        .then(res => res.ok ? res.json() : [])
+        .then(data => {
+          setProductosFiltrados(Array.isArray(data) ? data : []);
+        })
+        .catch(() => setProductosFiltrados([]));
+    }, 250); // 250ms debounce
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [busqueda, categoriaActual, productosIniciales]);
+
+  const productosEnOferta = productosFiltrados
     .filter((producto) => {
       const descuentoNumerico = Number(producto.descuento || 0);
       const precioOriginal = Number(producto.precioOriginal || 0);

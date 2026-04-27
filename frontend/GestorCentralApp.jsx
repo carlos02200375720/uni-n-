@@ -14,9 +14,13 @@ import { VentanaChat } from './chat/VentanaChat';
 // --- IMPORTACIÓN DE MÓDULOS SOCIALES Y USUARIO ---
 import PaginaInicioSocial from './social/PaginaInicioSocial';
 import PaginaPerfil from './perfil/PaginaPerfil';
+import { resolveApiBaseUrl } from './utils/api';
+import { obtenerSocketChat } from './utils/socket';
 
 // --- COMPONENTES GLOBALES ---
+
 import BarraNavegacion from './components/BarraNavegacion';
+import PanelAdmin from './admin/PanelAdmin';
 
 /**
  * GESTOR CENTRAL APP
@@ -26,8 +30,27 @@ import BarraNavegacion from './components/BarraNavegacion';
  * 3. Servir como puente entre todas las páginas.
  */
 const GestorCentralApp = () => {
-  const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const apiBaseUrl = resolveApiBaseUrl();
+
+  // Función para recargar productos desde el backend
+  const recargarProductosDesdeBackend = async () => {
+    try {
+      const respuesta = await fetch(`${apiBaseUrl}/api/tienda/productos?username=${usuario.username}`);
+      if (!respuesta.ok) throw new Error('No se pudo obtener productos');
+      const datos = await respuesta.json();
+      const productosApi = Array.isArray(datos) ? datos.map(normalizarProducto) : [];
+      setProductos(productosApi);
+    } catch (error) {
+      console.error('No se pudieron recargar los productos desde el backend.', error);
+    }
+  };
+
+  // Mostrar panel admin si la URL contiene '/admin'
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+    return <PanelAdmin recargarProductos={recargarProductosDesdeBackend} />;
+  }
   const imagenPorDefecto = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500';
+  const claveSesionUsuario = 'union-usuario-sesion';
   const combinarProductosSinDuplicados = (productosBase, productosExtra = []) => {
     const mapaProductos = new Map();
 
@@ -89,7 +112,9 @@ const GestorCentralApp = () => {
       tipoContenido: publicacion.tipoContenido || publicacion.tipo || 'imagen',
       likes: Number(publicacion.likes ?? 0),
       comentarios: Number(publicacion.comentarios ?? publicacion.comentariosCount ?? 0),
-      usuarioDioLike: Boolean(publicacion.usuarioDioLike)
+      listaComentarios: Array.isArray(publicacion.listaComentarios) ? publicacion.listaComentarios : [],
+      usuarioDioLike: Boolean(publicacion.usuarioDioLike),
+      usuarioDioDislike: Boolean(publicacion.usuarioDioDislike)
     };
   };
 
@@ -104,25 +129,45 @@ const GestorCentralApp = () => {
   // Estado de datos compartidos (El Carrito)
   const [carrito, setCarrito] = useState([]);
 
-  // --- DATOS DE PRUEBA (MOCK DATA) ---
-  const productosMock = [
-    { id: 1, nombre: 'iPhone 15 Pro', precio: 1199, precioOriginal: 1399, descuento: 14, oferta: true, likesCount: 128, comentariosCount: 18, imagenes: ['https://images.unsplash.com/photo-1696446701796-da61225697cc?w=900', 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=900', 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=900'], imagen: 'https://images.unsplash.com/photo-1696446701796-da61225697cc?w=500', categoria: 'Móviles' },
-    { id: 2, nombre: 'AirPods Max', precio: 549, precioOriginal: 699, descuento: 21, oferta: true, likesCount: 94, comentariosCount: 12, imagenes: ['https://images.unsplash.com/photo-1613040809024-b4ef7ba99bc3?w=900', 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=900', 'https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=900'], imagen: 'https://images.unsplash.com/photo-1613040809024-b4ef7ba99bc3?w=500', categoria: 'Audio' },
-    { id: 3, nombre: 'MacBook Air M3', precio: 1299, likesCount: 76, comentariosCount: 9, imagenes: ['https://images.unsplash.com/photo-1517336712461-1286c9527964?w=900', 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=900', 'https://images.unsplash.com/photo-1496180727794-817822f65950?w=900'], imagen: 'https://images.unsplash.com/photo-1517336712461-1286c9527964?w=500', categoria: 'Laptops' },
-    { id: 8, nombre: 'Tenis Urban Flex', precio: 89, precioOriginal: 119, descuento: 25, oferta: true, likesCount: 51, comentariosCount: 7, imagenes: ['https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=900', 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=900', 'https://images.unsplash.com/photo-1600185365483-26d7a4cc7519?w=900'], imagen: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500', categoria: 'Calzado', tallas: ['38', '39', '40', '41', '42'], colores: ['Negro', 'Blanco', 'Rojo'], descripcion: 'Producto de prueba para visualizar un flujo de compra con selección de talla y color antes de añadir al carrito o comprar.' }
-  ].map(normalizarProducto);
-  const productoDemoVariantes = productosMock.find((producto) => producto.id === 8);
-  const [productos, setProductos] = useState(productosMock);
-  const [usuario] = useState({
-    username: 'cristian_dev',
-    nombre: 'Cristian Rodríguez',
-    bio: 'Desarrollador Fullstack & Emprendedor.',
-    foto: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400'
+  // Eliminados datos de prueba (productosMock y productoDemoVariantes).
+  const [productos, setProductos] = useState([]);
+  const [usuario, setUsuario] = useState(() => ({ username: 'visitante', nombre: 'Visitante' }));
+  const [usuarioRegistrado, setUsuarioRegistrado] = useState(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    return Boolean(window.localStorage.getItem(claveSesionUsuario));
   });
 
   const [productosConMeGusta, setProductosConMeGusta] = useState([]);
   const [publicacionesSociales, setPublicacionesSociales] = useState([]);
   const [chats, setChats] = useState([]);
+  const [llamadaEntranteGlobal, setLlamadaEntranteGlobal] = useState(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (usuarioRegistrado) {
+      window.localStorage.setItem(claveSesionUsuario, JSON.stringify(usuario));
+    } else {
+      window.localStorage.removeItem(claveSesionUsuario);
+    }
+  }, [claveSesionUsuario, usuario, usuarioRegistrado]);
+
+  const activarSesionUsuario = (nuevoUsuario) => {
+    setUsuario((prevUsuario) => ({ ...prevUsuario, ...nuevoUsuario }));
+    setUsuarioRegistrado(true);
+  };
+
+  const cerrarSesionUsuario = () => {
+    setUsuario({ username: 'visitante', nombre: 'Visitante' });
+    setUsuarioRegistrado(false);
+    setSeccionActual('tienda');
+    setChatSeleccionado(null);
+    setProductoSeleccionado(null);
+  };
 
   const sincronizarProducto = (productoActualizado) => {
     setProductos((prevProductos) => prevProductos.map((producto) => producto.id === productoActualizado.id ? normalizarProducto(productoActualizado) : producto));
@@ -227,6 +272,56 @@ const GestorCentralApp = () => {
     }
   };
 
+  const alternarDislikePublicacion = async (publicacionId) => {
+    try {
+      const respuesta = await fetch(`${apiBaseUrl}/api/social/dislike`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          idPublicacion: publicacionId,
+          username: usuario.username
+        })
+      });
+
+      if (!respuesta.ok) throw new Error(`Error ${respuesta.status}`);
+
+      const datos = await respuesta.json();
+      const publicacionActualizada = normalizarPublicacion(datos.publicacion);
+
+      setPublicacionesSociales((prev) => prev.map((p) => p.id === publicacionActualizada.id ? publicacionActualizada : p));
+      return publicacionActualizada;
+    } catch (error) {
+      console.error('No se pudo actualizar el dislike de la publicación en la API.', error);
+      return null;
+    }
+  };
+
+  const agregarComentarioSocial = async (publicacionId, texto) => {
+    try {
+      const respuesta = await fetch(`${apiBaseUrl}/api/social/${publicacionId}/comentarios`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: usuario.username,
+          texto: texto.trim()
+        })
+      });
+
+      if (!respuesta.ok) throw new Error('Error al enviar comentario');
+
+      const datos = await respuesta.json();
+      const publicacionActualizada = normalizarPublicacion(datos.publicacion);
+
+      setPublicacionesSociales((prev) => prev.map((p) => p.id === publicacionActualizada.id ? publicacionActualizada : p));
+      return publicacionActualizada;
+    } catch (error) {
+      console.error('No se pudo guardar el comentario social.', error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     let activo = true;
 
@@ -246,11 +341,7 @@ const GestorCentralApp = () => {
 
         if (activo && Array.isArray(datos) && datos.length > 0) {
           const productosApi = datos.map(normalizarProducto);
-          const productosCombinados = productoDemoVariantes
-            ? combinarProductosSinDuplicados(productosApi, [productoDemoVariantes])
-            : productosApi;
-
-          setProductos(productosCombinados);
+          setProductos(productosApi);
           setProductosConMeGusta(Array.isArray(datosMeGusta) ? datosMeGusta.map(normalizarProducto) : []);
         }
       } catch (error) {
@@ -292,6 +383,53 @@ const GestorCentralApp = () => {
       activo = false;
     };
   }, [apiBaseUrl, usuario.username]);
+
+  useEffect(() => {
+    if (!usuario.username) {
+      return undefined;
+    }
+
+    const socket = obtenerSocketChat(apiBaseUrl);
+
+    if (!socket) {
+      return undefined;
+    }
+
+    const registrarUsuario = () => {
+      socket.emit('chat:registrar-usuario', { username: usuario.username });
+    };
+
+    const manejarLlamadaEntrante = (datos) => {
+      if (!datos?.id || !datos?.callerId) {
+        return;
+      }
+
+      const chatDeLlamada = chats.find((chat) => String(chat.id) === String(datos.callerId)) || {
+        id: String(datos.callerId),
+        nombre: datos.callerName || datos.callerUsername,
+        username: datos.callerUsername,
+        foto: imagenPorDefecto,
+        online: false,
+        ultimoMsg: 'Llamada entrante'
+      };
+
+      setLlamadaEntranteGlobal(datos);
+      setSeccionActual('mensajes');
+      setChatSeleccionado(chatDeLlamada);
+    };
+
+    if (socket.connected) {
+      registrarUsuario();
+    }
+
+    socket.on('connect', registrarUsuario);
+    socket.on('llamada:entrante', manejarLlamadaEntrante);
+
+    return () => {
+      socket.off('connect', registrarUsuario);
+      socket.off('llamada:entrante', manejarLlamadaEntrante);
+    };
+  }, [apiBaseUrl, chats, imagenPorDefecto, usuario.username]);
 
   useEffect(() => {
     let activo = true;
@@ -358,6 +496,8 @@ const GestorCentralApp = () => {
           setChatSeleccionado={setChatSeleccionado} 
           usernameActual={usuario.username}
           apiBaseUrl={apiBaseUrl}
+          llamadaEntranteInicial={llamadaEntranteGlobal}
+          onConsumirLlamadaEntrante={() => setLlamadaEntranteGlobal(null)}
         />
       );
     }
@@ -376,11 +516,11 @@ const GestorCentralApp = () => {
       
       // Secciones Principales
       case 'social':
-        return <PaginaInicioSocial publicaciones={publicacionesSociales} darLikePublicacion={alternarLikePublicacion} setSeccionActual={setSeccionActual} />;
+        return <PaginaInicioSocial publicaciones={publicacionesSociales} usuario={usuario || { username: 'visitante', nombre: 'Visitante' }} darLikePublicacion={alternarLikePublicacion} darDislikePublicacion={alternarDislikePublicacion} agregarComentarioPublicacion={agregarComentarioSocial} setSeccionActual={setSeccionActual} />;
       case 'mensajes':
-        return <PaginaInicioChat chats={chats} setChatSeleccionado={setChatSeleccionado} />;
+        return <PaginaInicioChat chats={chats} setChatSeleccionado={setChatSeleccionado} usernameActual={usuario.username} apiBaseUrl={apiBaseUrl} />;
       case 'perfil':
-        return <PaginaPerfil usuarioInicial={usuario} productosConMeGusta={productosConMeGusta} setProductoSeleccionado={setProductoSeleccionado} setSeccionActual={setSeccionActual} apiBaseUrl={apiBaseUrl} />;
+        return <PaginaPerfil usuarioInicial={usuario} productosConMeGusta={productosConMeGusta} setProductoSeleccionado={setProductoSeleccionado} setSeccionActual={setSeccionActual} apiBaseUrl={apiBaseUrl} requiereRegistroInicial={!usuarioRegistrado} onRegistroExitoso={activarSesionUsuario} onInicioSesionExitoso={activarSesionUsuario} onCerrarSesion={cerrarSesionUsuario} />;
         
       default:
         return <PaginaInicio productos={productos} productosConMeGusta={productosConMeGusta} alternarMeGustaProducto={alternarMeGustaProducto} agregarComentarioProducto={agregarComentarioProducto} setProductoSeleccionado={setProductoSeleccionado} setSeccionActual={setSeccionActual} carrito={carrito} />;

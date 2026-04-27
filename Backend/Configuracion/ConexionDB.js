@@ -5,21 +5,41 @@ let servidorMongoEnMemoria = null;
 const conectarMongoEnMemoria = async () => {
   const { MongoMemoryServer } = require('mongodb-memory-server');
 
-  servidorMongoEnMemoria = await MongoMemoryServer.create({
-    instance: { ip: '127.0.0.1' }
-  });
+  let ultimoError = null;
 
-  const uriEnMemoria = servidorMongoEnMemoria.getUri();
-  const conn = await mongoose.connect(uriEnMemoria, {
-    family: 4
-  });
+  for (let intento = 1; intento <= 3; intento += 1) {
+    try {
+      servidorMongoEnMemoria = await MongoMemoryServer.create({
+        instance: {
+          ip: '127.0.0.1',
+          launchTimeout: 60000
+        }
+      });
 
-  console.warn('⚠️ Atlas no estuvo disponible. Se inició MongoDB en memoria para desarrollo.');
+      const uriEnMemoria = servidorMongoEnMemoria.getUri();
+      const conn = await mongoose.connect(uriEnMemoria, {
+        family: 4
+      });
 
-  return {
-    conn,
-    usaMongoEnMemoria: true
-  };
+      console.warn('⚠️ Atlas no estuvo disponible. Se inició MongoDB en memoria para desarrollo.');
+
+      return {
+        conn,
+        usaMongoEnMemoria: true
+      };
+    } catch (error) {
+      ultimoError = error;
+
+      if (servidorMongoEnMemoria) {
+        await servidorMongoEnMemoria.stop();
+        servidorMongoEnMemoria = null;
+      }
+
+      console.warn(`⚠️ Falló el arranque de MongoDB en memoria (intento ${intento}/3).`);
+    }
+  }
+
+  throw ultimoError;
 };
 
 const conectarBaseDeDatos = async () => {
@@ -31,7 +51,6 @@ const conectarBaseDeDatos = async () => {
     }
 
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      family: 4,
       serverSelectionTimeoutMS: 5000,
       connectTimeoutMS: 5000
     });

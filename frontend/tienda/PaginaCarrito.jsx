@@ -104,7 +104,11 @@ export const PaginaCarrito = ({ carrito = [], setCarrito, setSeccionActual }) =>
               <div key={item.tempId || Math.random()} className="bg-white p-4 rounded-[28px] shadow-sm flex items-center gap-4 animate-in slide-in-from-left duration-300">
                 <div className="w-20 h-20 bg-gray-50 rounded-2xl overflow-hidden shrink-0">
                   <img 
-                    src={item.imagen} 
+                    src={
+                      item.coloresConImagen && Array.isArray(item.coloresConImagen) && item.colorSeleccionado
+                        ? (item.coloresConImagen.find(c => c.color === item.colorSeleccionado)?.imagen || item.imagen)
+                        : item.imagen
+                    }
                     className="w-full h-full object-cover" 
                     alt={item.nombre} 
                     onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=Producto'; }}

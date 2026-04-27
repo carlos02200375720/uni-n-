@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Lock, Truck, CreditCard, ShieldCheck } from 'lucide-react';
+import { resolveApiBaseUrl } from '../utils/api';
 
 // --- LÓGICA INTEGRADA (Anteriormente en LogicaPaginaCheckout.js) ---
 const useLogicaCheckout = (carrito, setCarrito, setSeccionActual, apiBaseUrl, usernameActual) => {
@@ -100,7 +101,7 @@ const useLogicaCheckout = (carrito, setCarrito, setSeccionActual, apiBaseUrl, us
 
 // --- VISTA COMPONENTE ---
 const PaginaCheckout = ({ carrito = [], setCarrito, setSeccionActual, usernameActual }) => {
-  const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const apiBaseUrl = resolveApiBaseUrl();
   const {
     paso,
     datos,

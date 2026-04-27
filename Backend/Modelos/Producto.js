@@ -1,3 +1,10 @@
+  // Relación color-imagen para variantes visuales
+  coloresConImagen: [
+    {
+      color: { type: String, required: true },
+      imagen: { type: String, required: true }
+    }
+  ],
 /**
  * MODELO DE PRODUCTO
  * Define el esquema estructural para los artículos de la tienda.

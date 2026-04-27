@@ -146,7 +146,10 @@ export const PaginaDetalleProducto = ({ producto, carrito, setCarrito, setSeccio
   if (!producto) return null;
 
   const alturaGaleria = 'aspect-square';
+  // Ordenar primero videos y luego imágenes
+  const videosProducto = Array.isArray(producto.videos) ? producto.videos : [];
   const imagenesProducto = Array.isArray(producto.imagenes) && producto.imagenes.length > 0 ? producto.imagenes : [producto.imagen];
+  const galeriaArchivos = [...videosProducto, ...imagenesProducto];
 
   React.useEffect(() => {
     setIndiceImagenActiva(0);
@@ -168,30 +171,38 @@ export const PaginaDetalleProducto = ({ producto, carrito, setCarrito, setSeccio
 
   return (
     <div className="min-h-screen bg-transparent animate-in slide-in-from-bottom-10 duration-500 pb-32">
-      {/* Cabecera con Imagen */}
+      {/* Cabecera con galería de videos e imágenes */}
       <div className={`fixed top-0 left-1/2 z-0 w-full max-w-md -translate-x-1/2 overflow-hidden ${alturaGaleria}`}>
         <div
           className="flex h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide scroll-smooth"
           onScroll={manejarScrollGaleria}
         >
-          {imagenesProducto.map((imagen, indice) => (
-            <div key={`${producto.id || producto.nombre}-detalle-imagen-${indice}`} className="h-full w-full shrink-0 snap-center">
-              <img 
-                src={imagen} 
-                className="w-full h-full object-cover" 
-                alt={`${producto.nombre} ${indice + 1}`}
-                onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500'; }}
-              />
-            </div>
-          ))}
+          {galeriaArchivos.map((archivo, indice) => {
+            const ext = (archivo.split ? archivo.split('.') : []).pop()?.toLowerCase() || '';
+            const isVideo = ["mp4","mov","avi","wmv","flv","mkv","webm"].includes(ext);
+            return (
+              <div key={`${producto.id || producto.nombre}-detalle-archivo-${indice}`} className="h-full w-full shrink-0 snap-center">
+                {isVideo ? (
+                  <video src={archivo} className="w-full h-full object-cover" controls />
+                ) : (
+                  <img 
+                    src={archivo}
+                    className="w-full h-full object-cover" 
+                    alt={`${producto.nombre} ${indice + 1}`}
+                    onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500'; }}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-black/15 to-black/50" />
 
-        {imagenesProducto.length > 1 && (
+        {galeriaArchivos.length > 1 && (
           <>
             <div className="pointer-events-none absolute inset-x-0 bottom-12 z-10 flex items-center justify-center px-4">
               <div className="flex items-center gap-1.5 rounded-full bg-black/45 px-3 py-1.5 backdrop-blur-sm shadow-lg">
-                {imagenesProducto.map((_, indice) => (
+                {galeriaArchivos.map((_, indice) => (
                   <span key={`${producto.id || producto.nombre}-detalle-indicador-${indice}`} className={`block rounded-full transition-all ${indice === indiceImagenActiva ? 'w-5 h-1.5 bg-white' : 'w-1.5 h-1.5 bg-white/60'}`} />
                 ))}
               </div>
@@ -238,7 +249,14 @@ export const PaginaDetalleProducto = ({ producto, carrito, setCarrito, setSeccio
           </div>
           <div className="text-right pt-0.5">
             <span className="text-[1.65rem] font-black text-blue-600 leading-none">${producto.precio}</span>
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Envío Gratis</p>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">
+              {producto.tiempoEnvio && (
+                <span>Envío: {producto.tiempoEnvio}</span>
+              )}
+              {producto.precioEnvio !== undefined && producto.precioEnvio !== '' && (
+                <span> | Costo: ${producto.precioEnvio}</span>
+              )}
+            </p>
           </div>
         </div>
 
@@ -277,7 +295,27 @@ export const PaginaDetalleProducto = ({ producto, carrito, setCarrito, setSeccio
               </div>
             )}
 
-            {Array.isArray(producto.colores) && producto.colores.length > 0 && (
+            {Array.isArray(producto.coloresConImagen) && producto.coloresConImagen.length > 0 ? (
+              <div>
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Color</h3>
+                  {colorSeleccionado && <span className="text-xs font-bold text-gray-400">Seleccionado: {colorSeleccionado}</span>}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {producto.coloresConImagen.map((colVar) => (
+                    <button
+                      key={`${producto.id}-colorimg-${colVar.color}`}
+                      type="button"
+                      onClick={() => setColorSeleccionado(colVar.color)}
+                      className={`rounded-2xl border p-1 text-sm font-black transition-all active:scale-95 flex flex-col items-center ${colorSeleccionado === colVar.color ? 'border-blue-600 bg-blue-50 shadow-lg shadow-blue-100' : 'border-gray-200 bg-white'}`}
+                    >
+                      <img src={colVar.imagen} alt={colVar.color} className="w-12 h-12 object-cover rounded mb-1 border" />
+                      <span className="text-xs font-bold text-gray-700">{colVar.color}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : Array.isArray(producto.colores) && producto.colores.length > 0 && (
               <div>
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Color</h3>
